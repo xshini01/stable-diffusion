@@ -125,6 +125,12 @@ if (inputs.trim() !== "") {
 }
 }"""
 
+checkThemeMode="""
+() => {
+    const button = document.querySelector('button:nth-of-type(2)');
+    button.innerText = document.body.classList.contains('dark') ? 'Light Mode' : 'Dark Mode';
+}"""
+
 all_images = []
 def generated_imgs(model_id, prompt, negative_prompt, scheduler_name, type_prediction, width, height, steps, scale, clip_skip, num_images,pipe, progress=gr.Progress(track_tqdm=True)):
     all_images = []
@@ -219,7 +225,7 @@ with gr.Blocks() as token_interface:
     output_label = gr.Label(label= "your token :")
     save_button.click(fn=save_token, inputs=token_input, outputs=output_label)
 
-with gr.Blocks(theme='JohnSmith9982/small_and_pretty') as ui:
+with gr.Blocks(theme='JohnSmith9982/small_and_pretty', js=checkThemeMode) as ui:
     with gr.Row():
         gr.Markdown(
             """
@@ -236,7 +242,7 @@ with gr.Blocks(theme='JohnSmith9982/small_and_pretty') as ui:
         lora_id_input = gr.Dropdown(choices=choices_Loras,label="LoRA", value=lora_id, allow_custom_value=True)
         with gr.Column():
             load_model_btn = gr.Button("Load Model", variant="primary", size='lg')
-            toggle_dark = gr.Button(value="Dark Mode", size='lg')
+            toggle_dark = gr.Button(value="", size='lg')
             toggle_dark.click(
                 None,
                 js="""
