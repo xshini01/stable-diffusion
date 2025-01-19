@@ -102,7 +102,7 @@ def set_ratings():
     return config.options_ratings if verify_token() else config.options_ratings[0:3]
 
 # generated imgs tags / genreated imgs prompts
-def generated_imgs_tags(copyright_tags, character_tags, general_tags, rating, aspect_ratio_tags, Length_prompt, pipe):
+def generated_imgs_tags(copyright_tags, character_tags, general_tags, rating, aspect_ratio_tags, Length_prompt, pipe, progress=gr.Progress(track_tqdm=True)):
     MODEL_NAME = "p1atdev/dart-v2-moe-sft"
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
     model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, torch_dtype=torch.bfloat16)
@@ -155,7 +155,7 @@ checkThemeMode="""
 }"""
 
 # generated imgs
-def generated_imgs(model_id, prompt, negative_prompt, scheduler_name, type_prediction, width, height, steps, scale, clip_skip, num_images,pipe):
+def generated_imgs(model_id, prompt, negative_prompt, scheduler_name, type_prediction, width, height, steps, scale, clip_skip, num_images,pipe, progress=gr.Progress(track_tqdm=True)):
     all_images = []
     gr.Progress(track_tqdm=True)
     model_id_lower = model_id.lower()
