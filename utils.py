@@ -2,9 +2,10 @@ import gc
 import os
 import torch
 import gradio as gr
-import time
 import requests
 import models
+import re
+from huggingface_hub import snapshot_download
 from tqdm import tqdm
 import bcrypt
 from google.colab import userdata
@@ -17,8 +18,8 @@ hf_token = None
 token_set = False
 ratings = None
 civitai_token = None
-model_name= None
-    
+
+# save token
 def save_token(token):
     global hf_token, token_set, ratings, civitai_token
     if token.startswith("hf_"):
@@ -35,19 +36,42 @@ def save_token(token):
     else:
         return "Continue without token"
 
+# check SDXL model
 def is_sdxl(model_path):
     return any(keyword in model_path for keyword in ["sd-xl", "sdxl", "xl", "illustrious"])
+
+
+def is_file_exists(path, file_target):
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    files = os.listdir(path)
+
+    if not file_target.endswith(".safetensors"):
+        normalized_file_target = re.sub(r'[-/]', '', file_target)
+        
+        for name_file in files:
+            normalized_name_file = re.sub(r'[-/]', '', name_file)
+            if normalized_file_target == normalized_name_file:
+                return True
+    else:
+        for name_file in files:
+            if name_file == file_target:
+                return True
+                
+    return False
+
 
 # auto remove clip_skip if sdxl model
 def clip_skip_visibility(model_id):
     if is_sdxl(model_id.lower()):
         return gr.update(visible=False)
-    if model_name is not None and is_sdxl(model_name.lower()):
-        return gr.update(visible=False)
-    return gr.update(visible=True)
+    else :
+        return gr.update(visible=True)
+
+# download model/lora
+def download_file(url, save_dir, progress=gr.Progress(track_tqdm=True)):
     
-def download_file(url):
-    save_dir="/content/stable-diffusion/models"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
@@ -56,26 +80,26 @@ def download_file(url):
         headers["Authorization"] = f"Bearer {civitai_token}"
     response = requests.get(url, stream=True, headers=headers if civitai_token else "")
     total_size = int(response.headers.get("content-length", 0))
-    progress = tqdm(total=total_size, unit="B", unit_scale=True)
-
-    # Cek jika respons sukses
+    progress = tqdm(total=total_size, unit="B", unit_scale=True, desc= "Downloading")
+    
     if response.status_code == 200:
-        # Ambil nama file dari header Content-Disposition (jika ada)
+        # get file name from header Content-Disposition
         if "content-disposition" in response.headers:
             content_disposition = response.headers["content-disposition"]
             filename = content_disposition.split("filename=")[-1].strip('"')
         else:
-            # Jika tidak ada, buat nama file berdasarkan nomor model dan format
-            model_id = url.split("/")[-1].split("?")[0]  # Ambil nomor model
-            filename = f"model_{model_id}.safetensors"
+            # or get file name from url
+            model_id = url.split("/")[-1].split("?")[0]
+            filename = f"{model_id}.safetensors"
         
-        # Simpan file dengan nama asli
+        # save file
+        clip_skip_visibility(filename)
         file_path = os.path.join(save_dir, filename)
         with open(file_path, "wb") as file:
             for chunk in response.iter_content(chunk_size=8192):
                 file.write(chunk)
                 progress.update(len(chunk))
-        progress.close()
+            progress.close()
         return file_path
     else:
         if response.status_code == 401 :
@@ -86,23 +110,26 @@ def download_file(url):
 
 # load Model and Lora
 def load_model(model_id, lora_id, btn_check, pipe, progress=gr.Progress(track_tqdm=True)):
-    global model_name
-
-    del pipe
-    torch.cuda.empty_cache()
-    gc.collect()
+    model_name = None
+    if pipe and not is_file_exists("/content/stable-diffusion/models", model_id) :
+        del pipe
+        torch.cuda.empty_cache()
+        gc.collect()
     try:
+        
+        if is_file_exists("/content/stable-diffusion/models", model_id):
+            pass
         # Handle URL model
-        if model_id.startswith(("http://", "https://")):
+        elif model_id.startswith(("http://", "https://")):
             gr.Info("Downloading model...")
             progress(0.1, desc="Downloading model")
             
-            download_path = download_file(model_id)
-            model_name = os.path.basename(download_path)
+            model_path = download_file(model_id, "/content/stable-diffusion/models")
+            model_name = os.path.basename(model_path)
             
             pipeline_class = StableDiffusionXLPipeline if is_sdxl(model_name.lower()) else StableDiffusionPipeline
             pipe = pipeline_class.from_single_file(
-                download_path,
+                model_path,
                 torch_dtype=torch.float16,
                 safety_checker=None if verify_token() else True,
                 token=hf_token or None
@@ -117,6 +144,7 @@ def load_model(model_id, lora_id, btn_check, pipe, progress=gr.Progress(track_tq
                 model_id,
                 cache_dir="/content/stable-diffusion/models",
                 torch_dtype=torch.float16,
+                use_safetensors=True,
                 token=hf_token or None,
                 safety_checker=None if verify_token() else True
             )
@@ -133,33 +161,43 @@ def load_model(model_id, lora_id, btn_check, pipe, progress=gr.Progress(track_tq
                 token=hf_token or None,
                 safety_checker=None if verify_token() else True
             )
-    
-        if lora_id:
-            try:
-                gr.Info("Loading LoRA...")
-                progress(0.5, desc="Loading LoRA")
-                
-                pipe.load_lora_weights(lora_id, adapter_name=lora_id)
-                pipe.fuse_lora(lora_scale=0.7)
-                gr.Info(f"LoRA {lora_id} loaded successfully")
-            except Exception as e:
-                gr.Warning(f"LoRA Error: {str(e)}")
-                gr.Info("Proceeding without LoRA")
-
-        # Move to GPU
-        pipe = pipe.enable_xformers_memory_efficient_attention()
-        pipe = pipe.to("cuda")
-        gr.Info(f"Load Model {model_id} and {lora_id} Success")
-        progress(1, desc="Model loaded successfully")
-        
+        pipe.enable_xformers_memory_efficient_attention()
     except Exception as e :
         gr.Warning(f"Loading Failed: {str(e)}")
+    
+    # Load Lora
+    lora_name = None
+    if lora_id:
+        try:
+            gr.Info("Loading LoRA...")
+            # Handle URL lora
+            if is_file_exists("/content/stable-diffusion/loras", lora_id):
+                pass
+            elif lora_id.startswith(("http://", "https://")):
+                lora_path = download_file(lora_id, "/content/stable-diffusion/loras")
+                lora_name = os.path.basename(lora_path)
+                pipe.load_lora_weights(lora_path, adapter_name=lora_name)
+                pipe.fuse_lora(lora_scale=0.7)
+            # Handle huggingface repo
+            else:
+                lora_path = snapshot_download(repo_id=lora_id, cache_dir="/content/stable-diffusion/loras")
+                pipe.load_lora_weights(lora_path, adapter_name=lora_id)
+                pipe.fuse_lora(lora_scale=0.7)
+            gr.Info(f"LoRA {lora_id} loaded successfully")    
+        except Exception as e:
+            gr.Warning(f"LoRA Error: {str(e)}")
+            gr.Info("Proceeding without LoRA")
+
+    # Move to GPU
+    pipe = pipe.to("cuda")
+    gr.Info(f"Load Model {model_id} and {lora_id} Success")
+    progress(1, desc="Model loaded successfully")
     generate_imgs = gr.Button(interactive=True)
     generated_imgs_with_tags = gr.Button()
     clear_output()
     if btn_check:
         generated_imgs_with_tags = gr.Button(interactive=True)
-    return pipe, model_id, lora_id, generate_imgs, generated_imgs_with_tags
+    return pipe, gr.update(value= model_name or model_id), gr.update(value=lora_name or lora_id), generate_imgs, generated_imgs_with_tags
 
 def verify_token(): 
     stored_hash = b'$2b$12$o.DA9bq6AOg.jL4848kIvu5oy2K/2Qs35dWENbi/p8yDQQH2epmZy'
@@ -185,8 +223,8 @@ def set_ratings():
     config = models.PromptConfig()
     return config.options_ratings if verify_token() else config.options_ratings[0:3]
 
-# generated imgs tags / genreated imgs prompts
-def generated_imgs_tags(copyright_tags, character_tags, general_tags, rating, aspect_ratio_tags, Length_prompt, pipe, progress=gr.Progress(track_tqdm=True)):
+# generated imgs tags / generated imgs prompts
+def generated_imgs_tags(copyright_tags, character_tags, general_tags, rating, aspect_ratio_tags, length_prompt, pipe, progress=gr.Progress(track_tqdm=True)):
     MODEL_NAME = "p1atdev/dart-v2-moe-sft"
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
     model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, torch_dtype=torch.bfloat16)
@@ -194,7 +232,7 @@ def generated_imgs_tags(copyright_tags, character_tags, general_tags, rating, as
     f"<|bos|>"
     f"<copyright>{copyright_tags}</copyright>"
     f"<character>{character_tags}</character>"
-    f"<|rating:{rating}|><|aspect_ratio:{aspect_ratio_tags}|><|length:{Length_prompt}|>"
+    f"<|rating:{rating}|><|aspect_ratio:{aspect_ratio_tags}|><|length:{length_prompt}|>"
     f"<general>{general_tags}<|identity:none|><|input_end|>"
     )
     inputs = tokenizer(prompt_template, return_tensors="pt").input_ids
@@ -251,7 +289,8 @@ def generated_imgs(model_id, prompt, negative_prompt, scheduler_name, type_predi
     pipe.scheduler = set_scheduler(scheduler_name, pipe.scheduler.config, scheduler_args)
 
     for _ in range(num_images):
-        if is_sdxl(model_id.lower()) or (model_name is not None and is_sdxl(model_name.lower())):
+        # Handle prompt SDXL model
+        if is_sdxl(model_id.lower()):
             compel = Compel(
                 tokenizer=[pipe.tokenizer, pipe.tokenizer_2],
                 text_encoder=[pipe.text_encoder, pipe.text_encoder_2],
