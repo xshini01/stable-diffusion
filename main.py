@@ -7,17 +7,17 @@ from IPython.display import clear_output
 clear_output()
 print("Setup Complete")
 
-all_images = []
 config = models.PromptConfig()
 
 def main():
     
     # gradio interface
     with gr.Blocks() as token_interface:
-        gr.Markdown("## Hugging Face token")
+        gr.Markdown("## Hugging Face or Civitai token")
         token_input = gr.Textbox(
-            label="input your Hugging Face token (opsional)",
-            placeholder="Enter your token here (opsional)...",
+            label="input your Hugging Face token or Civitai token",
+            info= "A Civitai token is required to download models from Civitai.",
+            placeholder="Enter your token here (opsional) ...",
             type="password"
         )
         save_button = gr.Button("Submit", variant="primary")
@@ -75,7 +75,6 @@ def main():
                 generated_imgs_with_tags_btn = gr.Button(value="Generate image with this prompt!",variant='primary', interactive=False)
 
                 with gr.Accordion(label="Advanced Prompt Images", open=False):
-                    model_id_lower = model_id_input.value.lower()
                     prompt_input = gr.Textbox(label="Prompt", value=config.prompt, lines=5)
                     negative_prompt_input = gr.Textbox(label="Negative Prompt", value=config.negative_prompt, lines=3)
                     with gr.Row():
@@ -98,8 +97,6 @@ def main():
                     steps_input = gr.Slider(minimum=1, maximum=50, step=1, label="Steps", value=config.steps)
                     scale_input = gr.Slider(minimum=1, maximum=20, step=0.5, label="Scale", value=config.scale)
                     clip_skip_input = gr.Slider(minimum=1, maximum=12, step=1, label="Clip Skip", value=config.clip_skip, visible=True)
-                    if "sd-xl" in model_id_lower or "sdxl" in model_id_lower or "xl" in model_id_lower:
-                        clip_skip_input.visible = False
                     num_images_input = gr.Slider(minimum=1, maximum=5, step=1, label="Number of Images", value=config.num_images)
                     generated_imgs_btn = gr.Button("Generate Images", variant="primary", interactive=False)
                 image_output = gr.Gallery(label="Generated Image",show_label=False,columns=[2], rows=[2], object_fit="contain", height="auto")
