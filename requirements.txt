@@ -1,5 +1,6 @@
 diffusers[torch]
 torch==2.5.1
+safetensors
 transformers
 accelerate
 compel
