@@ -42,8 +42,8 @@ def is_sdxl(model_path):
 
 
 def is_file_exists(path, file_target):
-    if not os.path.exists(path):
-        os.makedirs(path)
+
+    os.makedirs(path, exist_ok=True)
 
     files = os.listdir(path)
 
@@ -72,9 +72,7 @@ def clip_skip_visibility(model_id):
 # download model/lora
 def download_file(url, save_dir, progress=gr.Progress(track_tqdm=True)):
     
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-
+    os.makedirs(save_dir, exist_ok=True)
     headers = {}
     if civitai_token:
         headers["Authorization"] = f"Bearer {civitai_token}"
@@ -278,7 +276,10 @@ checkThemeMode="""
 
 # generated imgs
 def generated_imgs(model_id, prompt, negative_prompt, scheduler_name, type_prediction, width, height, steps, scale, clip_skip, num_images,pipe, progress=gr.Progress(track_tqdm=True)):
+    
     all_images = []
+    output_dir = "/content/stable-diffusion/images"
+    os.makedirs(output_dir, exist_ok=True)
     gr.Progress(track_tqdm=True)
 
     scheduler_args = {
@@ -305,7 +306,7 @@ def generated_imgs(model_id, prompt, negative_prompt, scheduler_name, type_predi
             embeds = compel(prompt)
             image = pipe(prompt_embeds=embeds, height=height, num_inference_steps=steps, width=width,
                          negative_prompt=negative_prompt, guidance_scale=scale, clip_skip=clip_skip).images[0]
-        image_path = f"output_image_{len(all_images) + 1}.png"
+        image_path = os.path.join(output_dir, f"output_image_{len(all_images) + 1}.png")
         image.save(image_path)
         all_images.append(image_path)
     return all_images
