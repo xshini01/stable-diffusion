@@ -173,7 +173,7 @@ def load_model(model_id, lora_id, btn_check, pipe, progress=gr.Progress(track_tq
                 pass
             elif lora_id.startswith(("http://", "https://")):
                 lora_path = download_file(lora_id, "/content/stable-diffusion/loras")
-                lora_name = os.path.basename(lora_path)
+                lora_name = os.path.splitext(os.path.basename(lora_path))[0]
                 pipe.load_lora_weights(lora_path, adapter_name=lora_name)
                 pipe.fuse_lora(lora_scale=0.7)
             # Handle huggingface repo
