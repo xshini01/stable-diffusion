@@ -52,7 +52,8 @@ def is_file_exists(path, file_target):
         
         for name_file in files:
             normalized_name_file = re.sub(r'[-/]', '', name_file)
-            if normalized_file_target == normalized_name_file:
+            lora_file = os.path.splitext(name_file)[0]
+            if normalized_file_target == normalized_name_file or lora_file == file_target:
                 return True
     else:
         for name_file in files:
