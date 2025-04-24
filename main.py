@@ -92,8 +92,8 @@ def main():
                             interactive=True,
                         )
 
-                    width_input = gr.Slider(minimum=256, maximum=2048, step=64, label="Width", value=config.width)
-                    height_input = gr.Slider(minimum=256, maximum=2048, step=64, label="Height", value=config.height)
+                    width_input = gr.Slider(minimum=256, maximum=3840, step=64, label="Width", value=config.width)
+                    height_input = gr.Slider(minimum=256, maximum=3840, step=64, label="Height", value=config.height)
                     steps_input = gr.Slider(minimum=1, maximum=50, step=1, label="Steps", value=config.steps)
                     scale_input = gr.Slider(minimum=1, maximum=20, step=0.5, label="Scale", value=config.scale)
                     clip_skip_input = gr.Slider(minimum=1, maximum=12, step=1, label="Clip Skip", value=config.clip_skip, visible=True)
