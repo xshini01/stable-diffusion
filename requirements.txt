@@ -1,9 +1,6 @@
 diffusers[torch]
-safetensors
 transformers
 accelerate
 compel
-peft
-gradio
-xformers
+xformers==0.0.29.post3
 bcrypt
