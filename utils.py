@@ -11,7 +11,7 @@ import bcrypt
 from google.colab import userdata
 from diffusers import StableDiffusionPipeline, StableDiffusionXLPipeline, DPMSolverMultistepScheduler
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from compel import Compel, ReturnedEmbeddingsType
+from compel import CompelForSD, CompelForSDXL
 from IPython.display import clear_output
 
 hf_token = None
@@ -293,20 +293,24 @@ def generated_imgs(model_id, prompt, negative_prompt, scheduler_name, type_predi
     for _ in range(num_images):
         # Handle prompt SDXL model
         if is_sdxl(model_id.lower()):
-            compel = Compel(
-                tokenizer=[pipe.tokenizer, pipe.tokenizer_2],
-                text_encoder=[pipe.text_encoder, pipe.text_encoder_2],
-                returned_embeddings_type=ReturnedEmbeddingsType.PENULTIMATE_HIDDEN_STATES_NON_NORMALIZED,
-                requires_pooled=[False, True]
-            )
-            conditioning, pooled = compel(prompt)
-            image = pipe(prompt_embeds=conditioning, pooled_prompt_embeds=pooled, height=height, num_inference_steps=steps, width=width,
-                         negative_prompt=negative_prompt, guidance_scale=scale).images[0]
+            compel = CompelForSDXL(pipe)
+            conditioning = compel(prompt, negative_prompt=negative_prompt)
+           
+
+            image = pipe(prompt_embeds=conditioning.embeds, 
+                pooled_prompt_embeds=conditioning.pooled_embeds,
+                negative_prompt_embeds=conditioning.negative_embeds,
+                negative_pooled_prompt_embeds=conditioning.negative_pooled_embeds,
+                height=height, num_inference_steps=steps, width=width,guidance_scale=scale).images[0]
+
         else:
-            compel = Compel(tokenizer=pipe.tokenizer, text_encoder=pipe.text_encoder)
-            embeds = compel(prompt)
-            image = pipe(prompt_embeds=embeds, height=height, num_inference_steps=steps, width=width,
-                         negative_prompt=negative_prompt, guidance_scale=scale, clip_skip=clip_skip).images[0]
+            compel = CompelForSD(pipe)
+            conditioning = compel(prompt, negative_prompt=negative_prompt)
+
+            image = pipe(prompt_embeds=conditioning.embeds, 
+                negative_prompt_embed=conditioning.negative_embeds,
+                height=height, num_inference_steps=steps, width=width,guidance_scale=scale,clip_skip=clip_skip).images[0]
+
         image_path = os.path.join(output_dir, f"output_image_{len(all_images) + 1}.png")
         image.save(image_path)
         all_images.append(image_path)
