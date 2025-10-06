@@ -9,12 +9,6 @@ print("Setup Complete")
 
 config = models.PromptConfig()
 
-def show_right_column(open): 
-    if open:
-        return gr.update(visible=True), gr.update(visible=False)
-    else:
-        return gr.update(visible=False), gr.update(visible=True)
-
 def main():
 
     # gradio interface
@@ -35,12 +29,7 @@ def main():
     while not utils.token_set:
         time.sleep(1)
 
-    with gr.Blocks(theme='JohnSmith9982/small_and_pretty', js=utils.checkThemeMode, css="""
-        .custom-css {
-            max-width: 800px;
-            margin: auto;
-        }
-    """) as ui:
+    with gr.Blocks(theme='JohnSmith9982/small_and_pretty', js=utils.checkThemeMode) as ui:
         with gr.Row():
             gr.Markdown(
                 """
@@ -69,59 +58,55 @@ def main():
                     """,
                 )
 
-        with gr.Row(equal_height=True) as content_row:
-            with gr.Column(scale=6, variant='panel') as left_col:
-                gr.Markdown("""
-                  ## **Generate Prompt**
-                  **This is an optional feature, you can directly Generate Images in ''Advanced Prompt Images''**
-                  """)
-                copyright_tags_input = gr.Textbox(label="Copyright Tags", value=config.copyright_tags)
-                character_tags_input = gr.Textbox(label="Character Tags", value=config.character_tags)
-                general_tags_input = gr.Textbox(label="General Tags", value=config.general_tags)
-                rating_input = gr.Radio(utils.ratings, label="Rating", value=config.rating)
-                aspect_ratio_tags_input = gr.Radio(config.options_aspect_ratio, label="Aspect Ratio", value=config.aspect_ratio_tags)
-                length_prompt_input = gr.Radio(config.options_length_prompt, label="Length Prompt", value=config.length_prompt)
-                generated_imgs_tags_btn = gr.Button("Generate Prompt", variant="primary")
-                with gr.Group():
-                    prompt_output = gr.Textbox(label="Result Generate Prompt",lines=3, value="", interactive=False)
-                    clipboard_btn = gr.Button(value="Copy to clipboard", interactive=False)
-                generated_imgs_with_tags_btn = gr.Button(value="Generate image with this prompt!", variant='primary', interactive=False)
-                show_toggle = gr.Checkbox(label="Show Advanced Prompt Images", value=False)
-
-            right_col = gr.Column(scale=6, variant='panel',visible=False)
-            with right_col:
-                gr.Markdown("## **Generate Images**")
-                prompt_input = gr.Textbox(label="Prompt", value=config.prompt, lines=5)
-                negative_prompt_input = gr.Textbox(label="Negative Prompt", value=config.negative_prompt, lines=3)
+        with gr.Tabs():
+            with gr.Tab("Txt2Img"):
                 with gr.Row():
-                    scheduler_input = gr.Dropdown(
-                        choices=list(config.schedulers.keys()),
-                        label="Scheduler",
-                        value="Euler",
-                        interactive=True,
-                    )
-                    type_prediction_input = gr.Dropdown(
-                        choices=["epsilon", "v_prediction"],
-                        label="Type Prediction",
-                        value="v_prediction",
-                        interactive=True,
-                    )
-                width_input = gr.Slider(minimum=256, maximum=3840, step=64, label="Width", value=config.width)
-                height_input = gr.Slider(minimum=256, maximum=3840, step=64, label="Height", value=config.height)
-                steps_input = gr.Slider(minimum=1, maximum=50, step=1, label="Steps", value=config.steps)
-                scale_input = gr.Slider(minimum=1, maximum=20, step=0.5, label="Scale", value=config.scale)
-                clip_skip_input = gr.Slider(minimum=1, maximum=12, step=1, label="Clip Skip", value=config.clip_skip, visible=False if utils.is_sdxl(config.model_id.lower()) else True)
-                num_images_input = gr.Slider(minimum=1, maximum=5, step=1, label="Number of Images", value=config.num_images)
-                generated_imgs_btn = gr.Button("Generate Images", variant="primary", interactive=False)
+                    with gr.Column(variant="panel"):
+                        gr.Markdown("## **Generate Images**")
+                        prompt_input = gr.Textbox(label="Prompt", value=config.prompt, lines=5)
+                        negative_prompt_input = gr.Textbox(label="Negative Prompt", value=config.negative_prompt, lines=3)
+                        with gr.Row():
+                            scheduler_input = gr.Dropdown(
+                                choices=list(config.schedulers.keys()),
+                                label="Scheduler",
+                                value="Euler",
+                                interactive=True,
+                            )
+                            type_prediction_input = gr.Dropdown(
+                                choices=["epsilon", "v_prediction"],
+                                label="Type Prediction",
+                                value="v_prediction",
+                                interactive=True,
+                            )
+                    with gr.Column(variant='panel'):
+                        width_input = gr.Slider(minimum=256, maximum=3840, step=64, label="Width", value=config.width)
+                        height_input = gr.Slider(minimum=256, maximum=3840, step=64, label="Height", value=config.height)
+                        steps_input = gr.Slider(minimum=1, maximum=50, step=1, label="Steps", value=config.steps)
+                        scale_input = gr.Slider(minimum=1, maximum=20, step=0.5, label="Scale", value=config.scale)
+                        clip_skip_input = gr.Slider(minimum=1, maximum=12, step=1, label="Clip Skip", value=config.clip_skip, visible=False if utils.is_sdxl(config.model_id.lower()) else True)
+                        num_images_input = gr.Slider(minimum=1, maximum=5, step=1, label="Number of Images", value=config.num_images)
+                        generated_imgs_btn = gr.Button("Generate Images", variant="primary", interactive=False)
+                        txt2img_gallery = gr.Gallery(label="Generated Image", columns=[2], rows=[2], object_fit="contain", height="auto")
 
-            placeholder_col = gr.Column(scale=6, visible=True)
-            with placeholder_col:
-                gr.Image(value="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExbnN5YTcxa3JldWJpaWd3Y3V4Z3NycHh4NWZsNTd6NzIxN2dpNzA3ZCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/HFmu1MFEmOudG95snb/giphy.gif", show_label=False, elem_id="placeholder-image")
-
-        show_toggle.change(show_right_column, inputs=show_toggle, outputs=[right_col, placeholder_col])
-
-        with gr.Row(elem_classes="custom-css"):
-            image_output = gr.Gallery(label="Generated Image", columns=[2], rows=[2], object_fit="contain", height="auto")
+            with gr.Tab("Generate prompt"):
+                with gr.Row():
+                    with gr.Column(variant='panel'):
+                        gr.Markdown("""
+                        ## **Generate Prompt**
+                        """)
+                        copyright_tags_input = gr.Textbox(label="Copyright Tags", value=config.copyright_tags)
+                        character_tags_input = gr.Textbox(label="Character Tags", value=config.character_tags)
+                        general_tags_input = gr.Textbox(label="General Tags", value=config.general_tags)
+                        rating_input = gr.Radio(utils.ratings, label="Rating", value=config.rating)
+                        aspect_ratio_tags_input = gr.Radio(config.options_aspect_ratio, label="Aspect Ratio", value=config.aspect_ratio_tags)
+                        length_prompt_input = gr.Radio(config.options_length_prompt, label="Length Prompt", value=config.length_prompt)
+                        
+                    with gr.Column(variant='panel'):
+                        generated_imgs_tags_btn = gr.Button("Generate Prompt", variant="primary")
+                        prompt_output = gr.Textbox(label="Result Generate Prompt",lines=3, value="", interactive=False)
+                        clipboard_btn = gr.Button(value="Copy to clipboard", interactive=False)
+                        generated_imgs_with_tags_btn = gr.Button(value="Generate image with this prompt!", variant='primary', interactive=False)
+                        prompt_gallery = gr.Gallery(label="Generated Image", columns=[2], rows=[2], object_fit="contain", height="auto")
 
         btn_check = gr.State()
         pipe = gr.State()
@@ -185,7 +170,7 @@ def main():
                 num_images_input,
                 pipe
             ],
-            outputs=image_output
+            outputs=prompt_gallery
         )
         generated_imgs_btn.click(
             utils.generated_imgs,
@@ -203,7 +188,7 @@ def main():
                 num_images_input,
                 pipe
             ],
-            outputs=image_output
+            outputs=txt2img_gallery
         )
         clear_output()
         ui.queue()
