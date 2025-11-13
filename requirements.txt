@@ -2,6 +2,7 @@ diffusers[torch]
 transformers
 accelerate
 compel
-xformers
+xformers==0.0.32.post2
 bcrypt
+
 
